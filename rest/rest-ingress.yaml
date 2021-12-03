@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rest-ingress
+  namespace: default
+  annotations:
+    # use the shared ingress-nginx
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+  - host: localhost ##FOR GOOGLE CLOUD REMOVE THIS LINE
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: rest-svc
+            port:
+              number: 5000
