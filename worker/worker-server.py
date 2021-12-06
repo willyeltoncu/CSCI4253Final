@@ -47,6 +47,7 @@ result = rabbitMQChannel.queue_declare(queue='toWorker')
 # rabbitMQChannel.queue_bind(exchange='logs', queue=result.method.queue)
 
 print("Waiting for Messages")
+print("ready for checkout? ")
 
 def callback(ch, method, properties, body):
     print("Received %r" % body.decode())
@@ -54,18 +55,7 @@ def callback(ch, method, properties, body):
     currSentence = body.decode()
     ch.basic_ack(delivery_tag=method.delivery_tag)
     sentence = Sentence(currSentence)
-    
-    # call predict
-    classifier.predict(sentence)
-
-    # check prediction 2, 3, ans 6 will be for rest deployment/service/ingress
-    # for worker 2 deployment /  service 
-
-
-
-    print("Result ", sentence.labels)
-
-    db.set(currSentence, str(sentence.labels))
+    # db.set(currSentence, str(sentence.labels))
     print("Set key : " + currSentence + "in db to : " + str(sentence.labels) )
 #     # make example sentence
 

@@ -5,10 +5,11 @@ import io, os, sys
 import pika, redis
 import hashlib, requests
 import json
+import pandas as pd 
 app = Flask(__name__)
 ##
 ## Configure test vs. production
-##
+# ##
 redisHost = os.getenv("REDIS_HOST") or "localhost"
 rabbitMQHost = os.getenv("RABBITMQ_HOST") or "localhost"
 db = redis.Redis(host=redisHost, db=1)   ##                                                                        
@@ -29,97 +30,55 @@ infoKey = f"{platform.node()}.worker.info"
 ##RABBITMQ PUBLISH/SUBSCRIBE LOOK UP 
 ## QUERE FOR WORKER-REST
 
-@app.route('/apiv1/analyze', methods=['POST'])  #store sentences db
-def analyze():
-    r = request  ##ADD SENTENCES TO RABBITMQ Q  
-    r2 = r.get_json()
-    sentences = r2['sentences']
-    for curSentence in sentences: 
+@app.route('/apiv1/load', methods=['POST'])  #store sentences db
+def load():
+    print("LOAD")
+    data = pd.read_csv("data.csv")
+    mydata = data[ ["brand", "price"] ] # only those columns
+    mydata.to_json(orient="records") # produces a string of your output which you can dump to a file
+    print(mydata)
+    pass
 
-    # rabbitMQChannel.basic_publish(exchange='', routing_key='toWorker', body=sentences)
-        rabbitMQChannel.basic_publish(exchange='',
-                         routing_key='toWorker',
-                         body=curSentence)
-        print(" [x] Sent %r" % curSentence)
-    return {"action": "queued"}
+
+@app.route('/apiv1/stock', methods=['GET'])  #print out all in stock items
+def message():
+    print("Here are all of our instock items : ")
+    for i in db.keys():
+        print(str(i))
+    return{"Number of items " : str(len(db.keys()))}
+    # r = request  ##ADD SENTENCES TO RABBITMQ Q  
+    # r2 = r.get_json()
+    
 
 
 # route http posts to this method
-@app.route('/apiv1/cache/sentiment', methods=['GET'])# get sentences from db cache AND sentence don't interact with the worker at all. 
-###updaate db in the worker 
-def cache():
-    # r = request.get_json()
-    # print("In CACHE ", r)
-    keysLst = db.keys()
-    returnLst = []
-    # print("DB: ", db.keys())
-    for key in keysLst:
-        # result  = {"model" : "sentiment", 
-        #             "result" : {
-        #                 "entities":[],
-        #                  "labels": [],
-                            # "text" : key
-        #             } 
-        
-        currKey = str(key.decode())
-        # print("Keyx : " ,  str(key.decode()))
-        print(db.get(str(currKey))) ##WHY IS THIS NOT WORKING WHEN
-        if db.get(str(currKey)) != None:
-            currVal = db.get(currKey)
-            # print("Current db entry: ", currVal)
-            workString = str(currVal.decode())
-            workString = workString[1:-1]
-            lst = workString.split(' ')
-            # print(workString.split(' '))
-            result  = {"model" : "sentiment", 
-                    "result" : {
-                        "entities":[],
-                         "labels": [
-                             {
-                             "confidence" : str(lst[1]),
-                             "value" : str(lst[0])
-                             }
-                         ],
-                            "text" : currKey
-                    }
-            } 
-            returnLst.append(result)
-            # returnLst.append({currVal})
-    return {"model": "sentiment", "sentences" : returnLst}
-    # return db.get('This thing sucks')
-
-
-@app.route('/apiv1/sentence', methods=['GET'])
-def sentence():
-    returnLst = []
+@app.route('/apiv1/populate', methods=['POST'])# get sentences from db cache AND sentence don't interact with the worker at all. 
+###updaate db in the with prices
+def populate():
     r = request.get_json()
-    sentences = r['sentences']
-    print(sentences)
-    for currSent in sentences: 
-        print("Keyx : " ,  str(currSent))
+    print(r)
+    for item in r['items']:
+        print("Item type / Brand : " , item['brand'])
+        print("Item Cost in USD : " , item['price'])
+        db.set(item['brand'], item['price'])
+    for i in db.keys():
+        # db.set(brand, price)
+        print(db[i]) #Possibly add to the db within the worker just to include rabbitMQ 
+    # sentences = r2['sentences']
+    # for curSentence in sentences: 
 
-        if db.get(currSent):
-            
-            result = db.get(currSent)
-            workStr = result.decode()
-            workStr = workStr[1:-1].split(' ')
-            result2  = {"model" : "sentiment", 
-                    "result" : {
-                        "entities":[],
-                         "labels": [
-                             {
-                             "confidence" : str(workStr[1]),
-                             "value" : str(workStr[0])
-                             }
-                         ],
-                            "text" : currSent
-                    }
-            } 
-            print(result.decode())
-            returnLst.append(result2)
-        if db.get(currSent) == None: 
-            returnLst.append({currSent :  "Not analyzed yet"})
-    return {"model" : 'sentiment', "sentences" :returnLst}
+    # # rabbitMQChannel.basic_publish(exchange='', routing_key='toWorker', body=sentences)
+    #     rabbitMQChannel.basic_publish(exchange='',
+    #                      routing_key='toWorker',
+    #                      body=curSentence)
+    #     print(" [x] Sent %r" % curSentence)
+    return {"yes": "yea"}
+
+@app.route('/apiv1/checkout', methods=['POST'])
+def checkout():
+    print("We hope you found everything you were looking for.")
+    ##Order processing maybe message to the worker 
+    return{"CO" : "WIP"}
 # start flask app
 app.run(host="0.0.0.0", port=5000)
 
