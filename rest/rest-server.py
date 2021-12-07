@@ -45,7 +45,7 @@ def message():
     print("Here are all of our instock items : ")
     for i in db.keys():
         print(str(i))
-    return{"Number of items " : str(len(db.keys()))}
+    return{"Number of items in stock " : str(len(db.keys()))}
     # r = request  ##ADD SENTENCES TO RABBITMQ Q  
     # r2 = r.get_json()
     
@@ -56,29 +56,38 @@ def message():
 ###updaate db in the with prices
 def populate():
     r = request.get_json()
-    print(r)
+    # print(r)
     for item in r['items']:
-        print("Item type / Brand : " , item['brand'])
-        print("Item Cost in USD : " , item['price'])
-        db.set(item['brand'], item['price'])
-    for i in db.keys():
-        # db.set(brand, price)
-        print(db[i]) #Possibly add to the db within the worker just to include rabbitMQ 
-    # sentences = r2['sentences']
-    # for curSentence in sentences: 
-
-    # # rabbitMQChannel.basic_publish(exchange='', routing_key='toWorker', body=sentences)
-    #     rabbitMQChannel.basic_publish(exchange='',
-    #                      routing_key='toWorker',
-    #                      body=curSentence)
-    #     print(" [x] Sent %r" % curSentence)
-    return {"yes": "yea"}
+        currItem = json.dumps(item)
+        # print("Send this : " , currItem)
+        rabbitMQChannel.basic_publish(exchange='',
+                         routing_key='toWorker',
+                         body=currItem)
+        print(" [x] Sent %r" % currItem)
+    return {"database": "populated"}
 
 @app.route('/apiv1/checkout', methods=['POST'])
 def checkout():
     print("We hope you found everything you were looking for.")
+    r = request.get_json()
+    print(r)
+    totalPrice = 0.0
+    recipt = []
+    for item in r['order']:
+        currItem = list(item.keys())[0] 
+        currQuant = list(item.values())[0]
+        print(currItem, currQuant)
+        if db.get(currItem):
+            addition = float(currQuant) * float(db.get(currItem))
+            totalPrice += addition
+            recipt.append(currItem + " -- " + str(addition))
+        else: 
+            recipt.append(currItem + str( " -- OUT OF STOCK (0.00)"))
     ##Order processing maybe message to the worker 
-    return{"CO" : "WIP"}
+    return{"Order Completed!" : [
+        {"Recipt" : recipt},
+        {"Total" : str(totalPrice)}
+        ]}
 # start flask app
 app.run(host="0.0.0.0", port=5000)
 

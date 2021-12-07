@@ -14,11 +14,11 @@ import requests
 import time
 import random
 
-from flair.models import TextClassifier
-from flair.data import Sentence
+# from flair.models import TextClassifier
+# from flair.data import Sentence
 
 
-classifier = TextClassifier.load('sentiment')
+# classifier = TextClassifier.load('sentiment')
 
 hostname = platform.node()
 
@@ -47,19 +47,14 @@ result = rabbitMQChannel.queue_declare(queue='toWorker')
 # rabbitMQChannel.queue_bind(exchange='logs', queue=result.method.queue)
 
 print("Waiting for Messages")
-print("ready for checkout? ")
-
 def callback(ch, method, properties, body):
     print("Received %r" % body.decode())
     time.sleep(body.count(b'.'))
-    currSentence = body.decode()
+    currmsg = body.decode()
     ch.basic_ack(delivery_tag=method.delivery_tag)
-    sentence = Sentence(currSentence)
-    # db.set(currSentence, str(sentence.labels))
-    print("Set key : " + currSentence + "in db to : " + str(sentence.labels) )
-#     # make example sentence
-
-#     print("Done")
+    currDict = json.loads(currmsg)
+    db.set(currDict['brand'], currDict['price'])
+    print("Database updated with ", (currDict['brand'], currDict['price']))
 
 rabbitMQChannel.basic_consume(queue='toWorker', on_message_callback=callback)
 
